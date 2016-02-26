@@ -32,3 +32,10 @@ WebMon - Monitors HTTP traffic on a server
 * curses
 * sqlite3
 
+### Building
+
+  python setup.py sdist --format=gztar
+
+### Installing
+
+  pip install wmon-<VERSION>.tar.gz

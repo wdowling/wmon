@@ -9,7 +9,7 @@ import logging
 import sys
 import time
 
-from console import console
+from wmon import sitemon
  
 __copyright__ = "Copyright 2016 William Dowling"
 __version__ = "0.1.0"
@@ -23,16 +23,21 @@ formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(module)s - \
 fh.setFormatter(formatter)
 logger.addHandler(fh)
 
-def start_console(filehandle, threshold):
-	""" Start the monitoring console
+def start_threads(filehandle, threshold):
+	""" Start concurrent threads.
 
-	Define the window design and initialize the console to display data.
+	Since we need to carry out several tasks concurrently, we initialize 3
+	threads for each of the modules: displayTraffic, scanLog and alert.
 	"""
 
-	cObj = console.Console()
-	console = consoleSetup()
-	logger.debug('Initalizing console...')
-	
+	sObj = sitemon.SiteMon(filehandle, threshold)
+	try:
+		sObj.monitorTraffic()
+	except:
+		e = sys.exc_info()[0]
+		logger.debug(str(e))
+		logger.debug('Exiting wmon')
+
 if __name__ == '__main__':
 
 	parser = argparse.ArgumentParser(description='Website Traffic Monitor')
@@ -40,8 +45,11 @@ if __name__ == '__main__':
 	parser.add_argument('-t', '--threshold', required=False, help='Threshold for total number of hits', type=int)
 	args = vars(parser.parse_args())
 
+	# Default threshold for traffic hits is 100
+	threshold = 100
+
 	filehandle = args['file']
 	if args['threshold']:
 		threshold = args['threshold']
 
-	initialize_console(filehandle, threshold)
+	start_threads(filehandle, threshold)
