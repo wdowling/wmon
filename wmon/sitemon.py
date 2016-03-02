@@ -87,8 +87,14 @@ class SiteMon(object):
 		print "Access Log Traffic Statistics"
 		while True:
 			time.sleep(10)
+			print "\n"
+			print "Leaderboard",
 			for self.row in self.c2.execute("SELECT * FROM leaderboard ORDER BY count DESC"):
-				print self.row
+				print self.row,
+			print "\n"
+			print "Statistics",
+			for self.row in self.c2.execute("SELECT * FROM stats ORDER BY count DESC"):
+				print self.row,
 
 	def scanLog(self):
 		""" Read access.log and parses data.
@@ -106,11 +112,29 @@ class SiteMon(object):
 
 			# Update the leaderboard table with the section of the site that has been accessed.
 			self.section = self.getSection(self.params['request'])
-			self.c1.execute("INSERT OR REPLACE INTO leaderboard (section, count, host) VALUES (:section, :host, COALESCE((SELECT count + 1 FROM leaderboard WHERE section=:section AND host=:host), 1))", {"section": self.section, "host": self.params['host']})
+			self.c1.execute("INSERT OR REPLACE INTO leaderboard (section, count) VALUES (:section, COALESCE((SELECT count + 1 FROM leaderboard WHERE section=:section), 1))", {"section": self.section})
+
+			# Update the statistics table with the number of hits coming from a single IP
+			# Address and the total bytes sent.
+			self.c1.execute("INSERT OR REPLACE INTO stats (host, bytes, count) VALUES (:host, COALESCE((SELECT bytes + :bytes FROM stats WHERE host=:host), 0), COALESCE((SELECT count + 1 FROM stats WHERE host=:host), 1))", {"host": self.params['host'], "bytes": self.params['size']})
 			self.conn1.commit()
 		
 	def alert(self):
-		pass
+		""" Alert if threshold is met
+
+		Scan the traffic database for number of hits within the past now - 120 seconds. If
+		number exceeds threshold, then populate the alert table with the current time and
+		number of hits. If on the next scan the number is below the threshold, update the table
+		with the recovery.
+		"""
+		self.c3, self.conn3 = self.getCursor()
+		while True:
+			time.sleep(10)
+			self.prev = time.time() - 120
+			print "\n"
+			print "Hits less than 2mins old"
+			for self.row in self.c3.execute("SELECT COUNT(*) FROM traffic WHERE epochtime>:prev", {"prev": self.prev}):
+				print self.row
 
 	def getCursor(self):
 		""" Return database cursor.
@@ -132,10 +156,10 @@ class SiteMon(object):
 		self.c, self.conn = self.getCursor()
 		self.c.execute('''CREATE table traffic
 					(epochtime real, host text, ident text, authuser text, date text, request text, status text, size int)''')
-		#self.c.execute('''CREATE table leaderboard
-		#			(section unique, count int, host text)''')
-		self.c.execute('''CREATE TABLE leaderboard
-					(section text, count int, host text, UNIQUE(section, host) ON CONFLICT REPLACE)''')
+		self.c.execute('''CREATE table leaderboard
+					(section unique, count int)''')
+		self.c.execute('''CREATE TABLE stats
+					(host unique, bytes int, count int)''')
 		self.c.execute('''CREATE table alerts
 					(epochtime real, count int)''')
 		self.conn.commit()
