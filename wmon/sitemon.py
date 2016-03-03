@@ -8,6 +8,7 @@ import sqlite3
 import sys
 import time
 
+from datetime import datetime
 from threading import Thread
 
 __copyright__ = "Copyright 2016 William Dowling"
@@ -119,6 +120,7 @@ class SiteMon(object):
 			self.c1.execute("INSERT OR REPLACE INTO stats (host, bytes, count) VALUES (:host, COALESCE((SELECT bytes + :bytes FROM stats WHERE host=:host), 0), COALESCE((SELECT count + 1 FROM stats WHERE host=:host), 1))", {"host": self.params['host'], "bytes": self.params['size']})
 			self.conn1.commit()
 		
+
 	def alert(self):
 		""" Alert if threshold is met
 
@@ -132,9 +134,17 @@ class SiteMon(object):
 			time.sleep(10)
 			self.prev = time.time() - 120
 			print "\n"
-			print "Hits less than 2mins old"
 			for self.row in self.c3.execute("SELECT COUNT(*) FROM traffic WHERE epochtime>:prev", {"prev": self.prev}):
-				print self.row
+				# Calculate the average number of hits across the previous 120 seconds
+				self.avghits = float(self.row[0]) / 120.0
+				if self.avghits > self.th:
+					print "High traffic generated on alert - hits = %s, trigger at %i.3f" % (self.avghits, datetime.now().strftime("%I:%M:%S%p"))
+					self.c3.execute("INSERT INTO alerts (epochtime, count) VALUES (:epochtime, :count)", {"epochtime": time.time(), "count": self.row[0]})
+					self.alertStatus = True
+				else:
+					print "Traffic volume normal"
+					print "Hits on average over past 2mins - %.3f", (self.avghits)
+					self.alertStatus = False
 
 	def getCursor(self):
 		""" Return database cursor.
@@ -154,13 +164,13 @@ class SiteMon(object):
 			alerts
 		"""
 		self.c, self.conn = self.getCursor()
-		self.c.execute('''CREATE table traffic
+		self.c.execute('''CREATE TABLE traffic
 					(epochtime real, host text, ident text, authuser text, date text, request text, status text, size int)''')
-		self.c.execute('''CREATE table leaderboard
+		self.c.execute('''CREATE TABLE leaderboard
 					(section unique, count int)''')
 		self.c.execute('''CREATE TABLE stats
 					(host unique, bytes int, count int)''')
-		self.c.execute('''CREATE table alerts
+		self.c.execute('''CREATE TABLE alerts
 					(epochtime real, count int)''')
 		self.conn.commit()
 
