@@ -1,3 +1,4 @@
 build/
 dist/
 wmon.egg-info/
+*.pyc
