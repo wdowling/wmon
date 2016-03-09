@@ -85,7 +85,7 @@ class SiteMon(object):
 		""" Display section of the website with most hits.
 		"""
 		self.c2, self.conn2 = self.getCursor()
-		print "Access Log Traffic Statistics"
+		"""print "Access Log Traffic Statistics"
 		while True:
 			time.sleep(10)
 			print "\n"
@@ -96,6 +96,9 @@ class SiteMon(object):
 			print "Statistics",
 			for self.row in self.c2.execute("SELECT * FROM stats ORDER BY count DESC"):
 				print self.row,
+		"""
+		Console.sendToScreen(self.c2.execute("SELECT * FROM leaderboard ORDER BY count DESC"))
+		Console.sendToScreen(self.c2.execute("SELECT * FROM leaderboard ORDER BY count DESC"))
 
 	def scanLog(self):
 		""" Read access.log and parses data.
@@ -138,7 +141,7 @@ class SiteMon(object):
 				# Calculate the average number of hits across the previous 120 seconds
 				self.avghits = float(self.row[0]) / 120.0
 				if self.avghits > self.th:
-					print "High traffic generated on alert - hits = %s, trigger at %i.3f" % (self.avghits, datetime.now().strftime("%I:%M:%S%p"))
+					print "High traffic generated on alert - hits = %s, trigger at %.3f" % (self.avghits, datetime.now().strftime("%I:%M:%S%p"))
 					self.c3.execute("INSERT INTO alerts (epochtime, count) VALUES (:epochtime, :count)", {"epochtime": time.time(), "count": self.row[0]})
 					self.alertStatus = True
 				else:
