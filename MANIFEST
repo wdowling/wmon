@@ -3,4 +3,5 @@ LICENSE.txt
 setup.py
 bin/wmon
 wmon/__init__.py
+wmon/console.py
 wmon/sitemon.py
