@@ -37,6 +37,7 @@ class TestAlert(unittest.TestCase):
 	def testAlert(self):
 		""" Scan previous 30 seconds for high traffic.
 		"""
+		pass
 
 	def tearDown(self):
 		""" Drop table and delete DB
