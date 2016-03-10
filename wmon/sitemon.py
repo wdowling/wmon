@@ -7,9 +7,11 @@ import shlex
 import sqlite3
 import sys
 import time
+import os
 
 from datetime import datetime
 from threading import Thread
+from trafficdatabase import TrafficDatabase
 
 __copyright__ = "Copyright 2016 William Dowling"
 __version__ = "0.1.0"
@@ -23,10 +25,11 @@ class SiteMon(object):
 		"""
 		self.fh = filehandle
 		self.th = threshold
-		try:
-			self.initializeDB()
-		except sqlite3.Error as e:
-			logger.debug(str(e))
+		#try:
+			#self.initializeDB()
+		self.dbObj = TrafficDatabase()
+		#except sqlite3.Error as e:
+		#	logger.debug(str(e))
 
 	def parseLine(self, l):
 		""" Parse logline.
@@ -56,11 +59,6 @@ class SiteMon(object):
 		self.r = request
 		return self.r.split()[1].split("/")[1]
 
-	def getInsertTime(self):
-		""" Return current time in seconds since the epoch.
-		"""
-		return time.time()
-
 	def follow(self, logfile):
 		""" Tail the logfile.
 
@@ -84,21 +82,53 @@ class SiteMon(object):
 	def displayTraffic(self):
 		""" Display section of the website with most hits.
 		"""
-		self.c2, self.conn2 = self.getCursor()
-		"""print "Access Log Traffic Statistics"
+		os.system('clear')
 		while True:
-			time.sleep(10)
-			print "\n"
-			print "Leaderboard",
-			for self.row in self.c2.execute("SELECT * FROM leaderboard ORDER BY count DESC"):
-				print self.row,
-			print "\n"
-			print "Statistics",
-			for self.row in self.c2.execute("SELECT * FROM stats ORDER BY count DESC"):
-				print self.row,
-		"""
-		Console.sendToScreen(self.c2.execute("SELECT * FROM leaderboard ORDER BY count DESC"))
-		Console.sendToScreen(self.c2.execute("SELECT * FROM leaderboard ORDER BY count DESC"))
+			print " wmon - Website Monitor."
+			print " Monitor traffic usage on your website."
+			print " File opened: /var/log/apache2/access.log "
+			print " --------------------------------------------------------------------"
+			print " Top Hits - sections with the most hits"
+			print " section    | hits "
+			self.lbrecords = self.dbObj.listRecord('leaderboard')
+			for self.row in self.lbrecords:
+				print " %s      | %s " % (self.row[0], self.row[1])        
+			print " --------------------------------------------------------------------"
+			print " Traffic Statistics"
+			print " host        | total bytes sent        | hits    "
+			self.statrecords = self.dbObj.listRecord('stats')
+			for self.row in self.statrecords:
+				print " %s      %s        %s" % (self.row[0], self.row[1], self.row[2])	
+			print " --------------------------------------------------------------------"
+			print " Alerts"
+			self.prev = time.time() - 120
+			self.alertrecords = self.dbObj.listRecord('traffic')
+			for self.row in self.alertrecords:
+				self.avghits = float(self.row[0]) / 120.0
+				self.alert = { 'count': self.row[0]}
+				if self.avghits > 0.1:
+					print " High traffic generated on alert - hits = %.3f" % (self.avghits)
+					self.dbObj.addRecord('alerts', self.alert)
+				else:
+					print " Traffic rate normal - hits = %.3f" % (self.avghits)
+
+			time.sleep(5)
+			os.system('clear')
+
+	def popTraffic(self, params):
+		table = 'traffic'
+		self.traffic = params
+		self.dbObj.addRecord(table, self.traffic)
+
+	def popLeaderBoard(self, section):
+		table = 'leaderboard'
+		self.lb = section
+		self.dbObj.addRecord(table, self.lb)
+
+	def popStats(self, params):
+		table = 'stats'
+		self.stats = params
+		self.dbObj.addRecord(table, self.stats)
 
 	def scanLog(self):
 		""" Read access.log and parses data.
@@ -106,23 +136,21 @@ class SiteMon(object):
 		This function reads the access.log file, parses each line and writes
 		the data to the traffic and leaderboard tables. 
 		"""
-		self.c1, self.conn1 = self.getCursor()
+		#self.c1, self.conn1 = self.getCursor()
 		self.loglines = self.follow(self.fh)
 		for self.l in self.loglines:
-			self.epochtime = self.getInsertTime()
 			self.params = self.parseLine(self.l)
-			self.c1.execute("INSERT INTO traffic VALUES (?,?,?,?,?,?,?,?)", 
-						(self.epochtime, self.params['host'], self.params['ident'], self.params['authuser'], self.params['date'], self.params['request'], self.params['status'], self.params['size']))
+
+			# Populate each table
+			self.popTraffic(self.params)
 
 			# Update the leaderboard table with the section of the site that has been accessed.
-			self.section = self.getSection(self.params['request'])
-			self.c1.execute("INSERT OR REPLACE INTO leaderboard (section, count) VALUES (:section, COALESCE((SELECT count + 1 FROM leaderboard WHERE section=:section), 1))", {"section": self.section})
+			self.section = { 'section': self.getSection(self.params['request'])}
+			self.popLeaderBoard(self.section)
 
 			# Update the statistics table with the number of hits coming from a single IP
 			# Address and the total bytes sent.
-			self.c1.execute("INSERT OR REPLACE INTO stats (host, bytes, count) VALUES (:host, COALESCE((SELECT bytes + :bytes FROM stats WHERE host=:host), 0), COALESCE((SELECT count + 1 FROM stats WHERE host=:host), 1))", {"host": self.params['host'], "bytes": self.params['size']})
-			self.conn1.commit()
-		
+			self.popStats(self.params)
 
 	def alert(self):
 		""" Alert if threshold is met
@@ -158,25 +186,6 @@ class SiteMon(object):
 		self.cursor = self.connection.cursor()
 		return self.cursor, self.connection
 
-	def initializeDB(self):
-		""" Initialize database and tables.
-
-		Create the following tables in the wmon database:
-			traffic
-			leaderboard
-			alerts
-		"""
-		self.c, self.conn = self.getCursor()
-		self.c.execute('''CREATE TABLE traffic
-					(epochtime real, host text, ident text, authuser text, date text, request text, status text, size int)''')
-		self.c.execute('''CREATE TABLE leaderboard
-					(section unique, count int)''')
-		self.c.execute('''CREATE TABLE stats
-					(host unique, bytes int, count int)''')
-		self.c.execute('''CREATE TABLE alerts
-					(epochtime real, count int)''')
-		self.conn.commit()
-
 	def monitorTraffic(self):
 		""" Entry point to begin monitoring.
 
@@ -189,7 +198,7 @@ class SiteMon(object):
 		try:
 			Thread(target = self.displayTraffic).start()
 			Thread(target = self.scanLog).start()
-			Thread(target = self.alert).start()
+			#Thread(target = self.alert).start()
 		except KeyboardInterrupt:
 			logger.debug("Exiting")
 			sys.exit(1)
