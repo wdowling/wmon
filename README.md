@@ -12,26 +12,6 @@ WebMon - Monitors HTTP traffic on a server
 * Write a test for the alerting logic
 * Explain how you’d improve on this application design
 
-### Tasks
-
-1. Develop command-line functionality with test:
-    $ ./wmon
-    usage:
-        wmon -f /var/log/apache2/access.log
-    $ ./wmon -h
-2. Develop using curses, initial layout of window. Implement key binding 'q' for quitting.
-3. Function to open access.log and read data into small sqlite DB.
-4. Function to scan every 10seconds, the previous 2mins of data. Keep count of amount of
-   hits to a section of a page.
-5. Function to print string if more than X hits received in previous two minutes.
-6. Output data to window.
-
-### Libraries needed
-
-* optparse
-* curses
-* sqlite3
-
 ### Building
 
   python setup.py sdist --format=gztar
@@ -39,3 +19,15 @@ WebMon - Monitors HTTP traffic on a server
 ### Installing
 
   pip install wmon-<VERSION>.tar.gz
+
+### Improvements
+
+* Use Python Curses library. This would provide a more powerful interface for the user allowing
+  them to scroll, select, or even provide basic input.
+* Refine and refactor code for performance. It has not been tested on large production scale systems
+  so there is a chance that it would fail in unusual ways.
+* Use more Pythonic code where applicable (maps, generators, decorators etc).
+* Offer suggestion to keep the SQLite database permenantly.
+* Offer option to create database where the user prefers.
+* Better error handling.
+* Improved Unittesting.

@@ -83,34 +83,51 @@ class SiteMon(object):
 		""" Display section of the website with most hits.
 		"""
 		os.system('clear')
+		count = 0
 		while True:
 			print " wmon - Website Monitor."
-			print " Monitor traffic usage on your website."
+			print " Observe traffic statistics for your site and alert on high traffiic."                        
 			print " File opened: /var/log/apache2/access.log "
-			print " --------------------------------------------------------------------"
-			print " Top Hits - sections with the most hits"
-			print " section    | hits "
-			self.lbrecords = self.dbObj.listRecord('leaderboard')
-			for self.row in self.lbrecords:
-				print " %s      | %s " % (self.row[0], self.row[1])        
-			print " --------------------------------------------------------------------"
-			print " Traffic Statistics"
-			print " host        | total bytes sent        | hits    "
-			self.statrecords = self.dbObj.listRecord('stats')
-			for self.row in self.statrecords:
-				print " %s      %s        %s" % (self.row[0], self.row[1], self.row[2])	
-			print " --------------------------------------------------------------------"
-			print " Alerts"
+			self.alert = False
 			self.prev = time.time() - 120
 			self.alertrecords = self.dbObj.listRecord('traffic')
 			for self.row in self.alertrecords:
 				self.avghits = float(self.row[0]) / 120.0
 				self.alert = { 'count': self.row[0]}
-				if self.avghits > 0.1:
+				if self.avghits > 0.1 and self.alert == False:
 					print " High traffic generated on alert - hits = %.3f" % (self.avghits)
 					self.dbObj.addRecord('alerts', self.alert)
+					self.alert = True
 				else:
-					print " Traffic rate normal - hits = %.3f" % (self.avghits)
+					print " Traffic rate normal - hits = %.3f" % (self.avghits)	
+					self.alert = False
+			print " --[Top Hits]-------------------------------------------------------------------"
+			print " {0:20} {1:20}".format('Section','Hits')
+			self.lbrecords = self.dbObj.listRecord('leaderboard')
+			if not self.lbrecords:
+				print " Waiting for traffic..."
+			else:
+				for self.row in self.lbrecords:
+					print " {0:20} {1:20} ".format(self.row[0], str(self.row[1]).ljust(0))        
+			print "\n"
+			print " --[Traffic Statistics]---------------------------------------------------------"
+			print " {0:20} {1:20} {2:20}".format('Host','Total Bytes Sent','Hits') 
+			self.statrecords = self.dbObj.listRecord('stats')
+			if not self.statrecords:
+				print " Waiting for traffic..."
+			else:
+				for self.row in self.statrecords:
+					print " {0:20} {1:20} {2:20}".format(self.row[0], str(self.row[1]).ljust(0), str(self.row[2]).ljust(0))	
+			print "\n"
+			print " --[Alert History]---------------------------------------------------------------------"
+			print " {0:20} {1:20}".format('Time', 'Avg Hits')
+			self.alrecords = self.dbObj.listRecord('alerts')	
+			if not self.alrecords:
+				print " No alerts generated..."
+			else:
+				if self.alert:
+					for self.row in self.alrecords:
+						print " {0:20} {1:20}".format(str(self.row[0]).ljust(0), str(self.row[1]).ljust(0))
 
 			time.sleep(5)
 			os.system('clear')
