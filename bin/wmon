@@ -1,8 +1,7 @@
 #!/usr/bin/env python
 """ wmon.py
 
-Application which monitors website traffic and provides a curses based window
-for the user.
+Application which monitors website traffic and provides updates to the user.
 """
 import argparse
 import logging
@@ -10,7 +9,7 @@ import sys
 import time
 
 from wmon import sitemon
- 
+
 __copyright__ = "Copyright 2016 William Dowling"
 __version__ = "0.1.0"
 
@@ -23,31 +22,34 @@ formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(module)s - \
 fh.setFormatter(formatter)
 logger.addHandler(fh)
 
-def start_threads(filehandle, threshold):
-	""" Start concurrent threads.
 
-	Since we need to carry out several tasks concurrently, we initialize 3
-	threads for each of the modules: displayTraffic, scanLog and alert.
-	"""
-	sObj = sitemon.SiteMon(filehandle, threshold)
-	try:
-		sObj.scanLog()
-	except KeyboardInterrupt:
-		logger.debug(str(e))
-		logger.debug('Exiting wmon')
+def start_app(filehandle, threshold):
+    """ Start application.
+
+    Instantiate SiteMon object and call the scanLog function which begins
+    reading the logfile.
+    """
+    sObj = sitemon.SiteMon(filehandle, threshold)
+    try:
+        sObj.scanLog()
+    except KeyboardInterrupt:
+        logger.debug(str(e))
+        logger.debug('Exiting wmon')
 
 if __name__ == '__main__':
 
-	parser = argparse.ArgumentParser(description='Website Traffic Monitor')
-	parser.add_argument('-f', '--file',required=True, help='Path to HTTP access log', type=file)
-	parser.add_argument('-t', '--threshold', required=False, help='Threshold for total number of hits', type=int)
-	args = vars(parser.parse_args())
+    parser = argparse.ArgumentParser(description='Website Traffic Monitor')
+    parser.add_argument('-f', '--file', required=True,
+                        help='Path to HTTP access log', type=file)
+    parser.add_argument('-t', '--threshold', required=False,
+                        help='Threshold for total number of hits', type=int)
+    args = vars(parser.parse_args())
 
-	# Default threshold for traffic hits is 100
-	threshold = 100
+    # Default threshold for traffic hits is 100
+    threshold = 100
 
-	filehandle = args['file']
-	if args['threshold']:
-		threshold = args['threshold']
+    filehandle = args['file']
+    if args['threshold']:
+        threshold = args['threshold']
 
-	start_threads(filehandle, threshold)
+    start_app(filehandle, threshold)

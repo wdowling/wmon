@@ -27,8 +27,8 @@ WebMon - Monitors HTTP traffic on a server
 * Refine and refactor code for performance. It has not been tested on large production scale systems
   so there is a chance that it would fail in unusual ways.
 * Use more Pythonic code where applicable (maps, generators, decorators etc).
-* Offer suggestion to keep the SQLite database permenantly.
 * Offer option to create database where the user prefers.
 * Possibly use threading which allows for multiple functions to work concurrently (scanLog and displayTraffic).
 * Better error handling.
 * Improved Unittesting.
+* Add more information to display such as top requests, users etc.

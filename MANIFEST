@@ -3,5 +3,6 @@ LICENSE.txt
 setup.py
 bin/wmon
 wmon/__init__.py
+wmon/display.py
 wmon/sitemon.py
 wmon/trafficdatabase.py

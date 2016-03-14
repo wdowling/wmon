@@ -9,8 +9,8 @@ import sys
 import time
 import os
 
-from datetime import datetime
 from trafficdatabase import TrafficDatabase
+from display import Display
 
 __copyright__ = "Copyright 2016 William Dowling"
 __version__ = "0.1.0"
@@ -21,10 +21,13 @@ class SiteMon(object):
 
 	def __init__(self, filehandle, threshold):
 		""" Basic initialization.
+
+		Ensure we can pass filehandle and threshold below and initialize database.
 		"""
 		self.fh = filehandle
 		self.th = threshold
 		self.dbObj = TrafficDatabase()
+		self.dsObj = Display(self.dbObj, self.fh, self.th)
 
 	def parseLine(self, l):
 		""" Parse logline.
@@ -74,61 +77,6 @@ class SiteMon(object):
 				continue
 			yield self.line
 
-	def displayTraffic(self):
-		""" Display section of the website with most hits.
-		"""
-		os.system('clear')
-		count = 0
-		self.activeAlert = False
-		try:
-			print " wmon - Website Monitor."
-			print " Observe traffic statistics for your site and alert on high traffiic."                        
-			print " File opened: /var/log/apache2/access.log "
-			self.prev = time.time() - 120
-			self.alertrecords = self.dbObj.listRecord('traffic')
-			for self.row in self.alertrecords:
-				self.avghits = float(self.row[0]) / 120.0
-				self.alert = { 'count': self.row[0]}
-				if self.avghits > 0.1 and self.activeAlert == False:
-					print " High traffic generated on alert - hits = %.3f" % (self.avghits)
-					self.alert['status'] = 'Alert'
-					self.alert['avghits'] = self.avghits
-					self.dbObj.addRecord('alerts', self.alert)
-					self.activeAlert = True
-				else:
-					print " Traffic rate normal - hits = %.3f" % (self.avghits)	
-					self.alert['status'] = 'Normal'
-					self.alert['avghits'] = self.avghits
-					self.dbObj.addRecord('alerts', self.alert)
-					self.activeAlert = False
-			print " --[Top Hits]-------------------------------------------------------------------"
-			print " {0:20} {1:20}".format('Section','Hits')
-			self.lbrecords = self.dbObj.listRecord('leaderboard')
-			if not self.lbrecords:
-				print " Waiting for traffic..."
-			else:
-				for self.row in self.lbrecords:
-					print " {0:20} {1:20} ".format(self.row[0], str(self.row[1]).ljust(0))        
-			print "\n"
-			print " --[Traffic Statistics]---------------------------------------------------------"
-			print " {0:20} {1:20} {2:20}".format('Host','Total Bytes Sent','Hits') 
-			self.statrecords = self.dbObj.listRecord('stats')
-			if not self.statrecords:
-				print " Waiting for traffic..."
-			else:
-				for self.row in self.statrecords:
-					print " {0:20} {1:20} {2:20}".format(self.row[0], str(self.row[1]).ljust(0), str(self.row[2]).ljust(0))	
-			print "\n"
-			print " --[Alert History]---------------------------------------------------------------------"
-			print " {0:20} {1:10} {2:20}".format('Time', 'Status', 'Avg Hits')
-			self.alrecords = self.dbObj.listRecord('alerts')	
-			for self.row in self.alrecords:
-				print " {0:20} {1:10} {2:20}".format(str(self.row[0]), str(self.row[1]).ljust(0), str(self.row[2]).ljust(0))
-
-		except KeyboardInterrupt:
-			print "Shutting down cleanly..."
-			return
-
 	def popTraffic(self, params):
 		table = 'traffic'
 		self.traffic = params
@@ -150,7 +98,6 @@ class SiteMon(object):
 		This function reads the access.log file, parses each line and writes
 		the data to the traffic and leaderboard tables. 
 		"""
-		#self.c1, self.conn1 = self.getCursor()
 		self.loglines = self.follow(self.fh)
 		try:
 			for self.l in self.loglines:
@@ -167,9 +114,8 @@ class SiteMon(object):
 				# Address and the total bytes sent.
 				self.popStats(self.params)
 
-				#Ping
-				#self.ping()
-				self.displayTraffic()
+				# Update screen with traffic statistics and alerts
+				self.dsObj.displayTraffic()
 		except KeyboardInterrupt:
 			print "Shutting down cleanly..."
 			self.fh.close()
