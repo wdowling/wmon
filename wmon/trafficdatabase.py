@@ -19,7 +19,7 @@ class TrafficDatabase(object):
 		c.execute('''CREATE TABLE stats
 						(host unique, bytes int, count int)''')
 		c.execute('''CREATE TABLE alerts
-						(epochtime real, count int)''')
+						(time unique, status text, avghits real)''')
 		db.commit()
 		c.close()
 
@@ -43,7 +43,7 @@ class TrafficDatabase(object):
 		elif self.table == 'stats':
 			c.execute("INSERT OR REPLACE INTO stats (host, bytes, count) VALUES (:host, COALESCE((SELECT bytes + :bytes FROM stats WHERE host=:host), 0), COALESCE((SELECT count + 1 FROM stats WHERE host=:host), 1))", {"host": self.params['host'], "bytes": self.params['size']})
 		elif self.table == 'alerts':
-			c.execute("INSERT INTO alerts (epochtime, count) VALUES (:epochtime, :count)", {"epochtime": self.datetime, "count": self.params['count']})
+			c.execute("INSERT OR REPLACE INTO alerts (time, status, avghits) VALUES(:time, :status, :avghits)", {"time": self.datetime, "status": self.params['status'], "avghits": self.params['avghits']})
 
 		db.commit()
 		c.close()
@@ -60,7 +60,7 @@ class TrafficDatabase(object):
 			self.prev = time.time() - 120
 			c.execute('SELECT COUNT(*) FROM traffic WHERE epochtime>:prev', {"prev": self.prev})
 		elif self.table == 'alerts':
-			 c.execute('SELECT DISTINCT epochtime, count FROM alerts ORDER BY epochtime DESC LIMIT 10')
+			c.execute('SELECT DISTINCT time, status, avghits FROM alerts WHERE status = "Alert" ORDER BY time DESC LIMIT 10')
 		
 		records = c.fetchall()
 		c.close()

@@ -10,7 +10,6 @@ import time
 import os
 
 from datetime import datetime
-from threading import Thread
 from trafficdatabase import TrafficDatabase
 
 __copyright__ = "Copyright 2016 William Dowling"
@@ -25,11 +24,7 @@ class SiteMon(object):
 		"""
 		self.fh = filehandle
 		self.th = threshold
-		#try:
-			#self.initializeDB()
 		self.dbObj = TrafficDatabase()
-		#except sqlite3.Error as e:
-		#	logger.debug(str(e))
 
 	def parseLine(self, l):
 		""" Parse logline.
@@ -84,23 +79,28 @@ class SiteMon(object):
 		"""
 		os.system('clear')
 		count = 0
-		while True:
+		self.activeAlert = False
+		try:
 			print " wmon - Website Monitor."
 			print " Observe traffic statistics for your site and alert on high traffiic."                        
 			print " File opened: /var/log/apache2/access.log "
-			self.alert = False
 			self.prev = time.time() - 120
 			self.alertrecords = self.dbObj.listRecord('traffic')
 			for self.row in self.alertrecords:
 				self.avghits = float(self.row[0]) / 120.0
 				self.alert = { 'count': self.row[0]}
-				if self.avghits > 0.1 and self.alert == False:
+				if self.avghits > 0.1 and self.activeAlert == False:
 					print " High traffic generated on alert - hits = %.3f" % (self.avghits)
+					self.alert['status'] = 'Alert'
+					self.alert['avghits'] = self.avghits
 					self.dbObj.addRecord('alerts', self.alert)
-					self.alert = True
+					self.activeAlert = True
 				else:
 					print " Traffic rate normal - hits = %.3f" % (self.avghits)	
-					self.alert = False
+					self.alert['status'] = 'Normal'
+					self.alert['avghits'] = self.avghits
+					self.dbObj.addRecord('alerts', self.alert)
+					self.activeAlert = False
 			print " --[Top Hits]-------------------------------------------------------------------"
 			print " {0:20} {1:20}".format('Section','Hits')
 			self.lbrecords = self.dbObj.listRecord('leaderboard')
@@ -120,17 +120,14 @@ class SiteMon(object):
 					print " {0:20} {1:20} {2:20}".format(self.row[0], str(self.row[1]).ljust(0), str(self.row[2]).ljust(0))	
 			print "\n"
 			print " --[Alert History]---------------------------------------------------------------------"
-			print " {0:20} {1:20}".format('Time', 'Avg Hits')
+			print " {0:20} {1:10} {2:20}".format('Time', 'Status', 'Avg Hits')
 			self.alrecords = self.dbObj.listRecord('alerts')	
-			if not self.alrecords:
-				print " No alerts generated..."
-			else:
-				if self.alert:
-					for self.row in self.alrecords:
-						print " {0:20} {1:20}".format(str(self.row[0]).ljust(0), str(self.row[1]).ljust(0))
+			for self.row in self.alrecords:
+				print " {0:20} {1:10} {2:20}".format(str(self.row[0]), str(self.row[1]).ljust(0), str(self.row[2]).ljust(0))
 
-			time.sleep(5)
-			os.system('clear')
+		except KeyboardInterrupt:
+			print "Shutting down cleanly..."
+			return
 
 	def popTraffic(self, params):
 		table = 'traffic'
@@ -155,67 +152,25 @@ class SiteMon(object):
 		"""
 		#self.c1, self.conn1 = self.getCursor()
 		self.loglines = self.follow(self.fh)
-		for self.l in self.loglines:
-			self.params = self.parseLine(self.l)
-
-			# Populate each table
-			self.popTraffic(self.params)
-
-			# Update the leaderboard table with the section of the site that has been accessed.
-			self.section = { 'section': self.getSection(self.params['request'])}
-			self.popLeaderBoard(self.section)
-
-			# Update the statistics table with the number of hits coming from a single IP
-			# Address and the total bytes sent.
-			self.popStats(self.params)
-
-	def alert(self):
-		""" Alert if threshold is met
-
-		Scan the traffic database for number of hits within the past now - 120 seconds. If
-		number exceeds threshold, then populate the alert table with the current time and
-		number of hits. If on the next scan the number is below the threshold, update the table
-		with the recovery.
-		"""
-		self.c3, self.conn3 = self.getCursor()
-		while True:
-			time.sleep(10)
-			self.prev = time.time() - 120
-			print "\n"
-			for self.row in self.c3.execute("SELECT COUNT(*) FROM traffic WHERE epochtime>:prev", {"prev": self.prev}):
-				# Calculate the average number of hits across the previous 120 seconds
-				self.avghits = float(self.row[0]) / 120.0
-				if self.avghits > self.th:
-					print "High traffic generated on alert - hits = %s, trigger at %.3f" % (self.avghits, datetime.now().strftime("%I:%M:%S%p"))
-					self.c3.execute("INSERT INTO alerts (epochtime, count) VALUES (:epochtime, :count)", {"epochtime": time.time(), "count": self.row[0]})
-					self.alertStatus = True
-				else:
-					print "Traffic volume normal"
-					print "Hits on average over past 2mins - %.3f", (self.avghits)
-					self.alertStatus = False
-
-	def getCursor(self):
-		""" Return database cursor.
-
-		Return a cursor for each database connection opened.
-		"""
-		self.connection = sqlite3.connect('/tmp/wmon.db')
-		self.cursor = self.connection.cursor()
-		return self.cursor, self.connection
-
-	def monitorTraffic(self):
-		""" Entry point to begin monitoring.
-
-		This module carries out a number of tasks. It starts several threads
-		for each of the three main functions of the application:
-			displayTraffic()
-			scanLog()
-			alert()
-		"""
 		try:
-			Thread(target = self.displayTraffic).start()
-			Thread(target = self.scanLog).start()
-			#Thread(target = self.alert).start()
+			for self.l in self.loglines:
+				self.params = self.parseLine(self.l)
+
+				# Populate each table
+				self.popTraffic(self.params)
+
+				# Update the leaderboard table with the section of the site that has been accessed.
+				self.section = { 'section': self.getSection(self.params['request'])}
+				self.popLeaderBoard(self.section)
+
+				# Update the statistics table with the number of hits coming from a single IP
+				# Address and the total bytes sent.
+				self.popStats(self.params)
+
+				#Ping
+				#self.ping()
+				self.displayTraffic()
 		except KeyboardInterrupt:
-			logger.debug("Exiting")
-			sys.exit(1)
+			print "Shutting down cleanly..."
+			self.fh.close()
+			return

@@ -29,12 +29,10 @@ def start_threads(filehandle, threshold):
 	Since we need to carry out several tasks concurrently, we initialize 3
 	threads for each of the modules: displayTraffic, scanLog and alert.
 	"""
-
 	sObj = sitemon.SiteMon(filehandle, threshold)
 	try:
-		sObj.monitorTraffic()
-	except:
-		e = sys.exc_info()[0]
+		sObj.scanLog()
+	except KeyboardInterrupt:
 		logger.debug(str(e))
 		logger.debug('Exiting wmon')
 
