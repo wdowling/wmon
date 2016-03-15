@@ -6,7 +6,6 @@ Application which monitors website traffic and provides updates to the user.
 import argparse
 import logging
 import sys
-import time
 
 from wmon import sitemon
 

@@ -37,12 +37,15 @@ Observe traffic statistics for your site and alert on high traffiic. Alert if \n
 threshold is exceeded within the previous 2 minutes.\n"
 			print " File opened: %s" % self.fh.name
 			print " Current threshold: %d" % self.th
-			self.prev = time.time() - 120
+
+			# Return all records insert within the previous 2 minutes.
+			# Since we *should* be updating the database upto multiple times per
+			# second, return the average across the previous 120 seconds.
 			self.alertrecords = self.dbObj.listRecord('traffic')
 			for self.row in self.alertrecords:
 				self.avghits = float(self.row[0]) / 120.0
 				self.alert = { 'count': self.row[0]}
-				if self.avghits > 0.1 and self.activeAlert == False:
+				if self.avghits > self.th and self.activeAlert == False:
 					self.currtime = datetime.today().strftime("%H:%M:%S")
 					print " High traffic generated an alert - average hits = %.3f, triggered at %s \n" % (self.avghits, self.currtime)
 					self.alert['status'] = 'Alert'

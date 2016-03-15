@@ -5,6 +5,7 @@ Test alert module.
 import os
 import unittest
 import sqlite3
+import time
 from wmon import sitemon
 
 class TestAlert(unittest.TestCase):
@@ -12,6 +13,7 @@ class TestAlert(unittest.TestCase):
 	def setUp(self):
 		""" Generate 60 seconds of false data for testing.
 		"""
+		self.threshold = 1
 		self.testlogfile = open('./tests/dummydata.txt')
 		self.connection = sqlite3.connect('/tmp/wmon_test.db')
 		self.cursor = self.connection.cursor()
@@ -32,12 +34,20 @@ class TestAlert(unittest.TestCase):
 			for self.field in self.row:
 				self.count = self.count + 1
 
-		self.assertEqual(self.count, 112)
+		self.assertEqual(self.count, 2112)
 
 	def testAlert(self):
-		""" Scan previous 30 seconds for high traffic.
+		""" Scan previous 120 seconds for high traffic.
+
+		Because of the nature of how displayTraffic() is written, the alerting
+		logic is built in. I replicate the code below to test. A better way would
+		be to pull out the code for the alerting logic into its own function.
 		"""
-		pass
+		self.currentTime = 1458049205.43
+		self.prev = self.currentTime - 120
+		for self.row in self.cursor.execute('''SELECT COUNT(*) FROM traffic WHERE epochtime>:prev''', {"prev": self.prev}):
+			self.avghits = float(self.row[0]) / 120.0
+			self.assertGreater(self.avghits, self.threshold)
 
 	def tearDown(self):
 		""" Drop table and delete DB
